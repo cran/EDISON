@@ -1,6 +1,44 @@
+#' Makes a structure move.
+#' 
+#' This function makes a network structure move.
+#' 
+#' 
+#' @param x Response data.
+#' @param y Target data.
+#' @param S Network structure for the current target node, a NumSegs by
+#' NumNodes matrix.
+#' @param B Same as \code{S}, but including the regression parameters.
+#' @param Sig2 Sigma squared parameters.
+#' @param q Number of nodes.
+#' @param qmax Maximum number of parents.
+#' @param network.info Network information, as collected by
+#' \code{\link{CollectNetworkInfo}}.
+#' @param method Information sharing method: Either \code{'poisson'},
+#' \code{'exp_hard'},
+#' 
+#' \code{'exp_soft'}, \code{'bino_hard'}, \code{'bino_soft'}.
+#' @param Mphase Segment boundary positions.
+#' @param E Changepoint vector.
+#' @param fixed.edges Matrix of size NumNodes by NumNodes, with 
+#' \code{fixed.edges[i,j]==1|0} if the edge between nodes i and j is fixed, and 
+#' -1 otherwise. Defaults to \code{NULL} (no edges fixed).
+#' @param HYPERvar Hyperparameter variables.
+#' @return Returns a list containing the following elements:
+#' \item{newS}{Updated network structure.} \item{newB}{Updated network
+#' structure with regression parameters.} \item{move}{Type of move being made:
+#' 1 for network structure moves.} \item{accept}{\code{1} if the move has been
+#' accepted, \code{0} otherwise.}
+#' @author Frank Dondelinger
+#' @references For more information about the MCMC moves, see:
+#' 
+#' Dondelinger et al. (2012), "Non-homogeneous dynamic Bayesian networks with
+#' Bayesian regularization for inferring gene regulatory networks with
+#' gradually time-varying structure", Machine Learning.
+#' @export make_structure_move
 make_structure_move <-
 function(x, y, S, B, Sig2, q,  
-                                qmax, network.info, method, Mphase, E, HYPERvar) {
+                                qmax, network.info, method, Mphase, E, 
+         fixed.edges, HYPERvar) {
   # Makes a network structure move for one edge in one of the segments.
   #
   # Args:
@@ -62,22 +100,15 @@ function(x, y, S, B, Sig2, q,
   move = 4
 
   for(segment in 1:(length(E)-1)) {
-      
-    # Half the time, swap the edge state
-    if(runif(1, 0, 1) > 0.5) {
-      network.info$new.nets[[segment]][edge, network.info$target] = 
-        !network.info$new.nets[[segment]][edge, network.info$target]*1
-    }
-
+    B.temp = B[segment,]
+    S.temp = (abs(B.temp) > 0) * 1  
+    
     seg.start = E[segment]
     seg.end   = E[segment + 1] 
 
     y.temp = y[ Mphase[seg.start]:(Mphase[seg.end]-1) ] 
     x.temp = x[ Mphase[seg.start]:(Mphase[seg.end]-1), ]
-      
-    B.temp = B[segment,]
-    S.temp = (abs(B.temp) > 0) * 1
-
+    
     Sig2.temp = Sig2[segment]
 
     k = sum(S.temp)-1
@@ -95,22 +126,25 @@ function(x, y, S, B, Sig2, q,
     ## Compute the projection matrix with the current edge ("Pxl")
     Pxl = computePx(length(y.temp), x.temp[,which(S.temp == 1)], 
                       delta2[segment])
-   
-    S.temp[network.info$parent] = network.info$new.nets[[segment]][edge, network.info$target]*1
-    S.proposal[segment,] = S.temp
 
-    # No change
-    if(S.temp[network.info$parent] == 
-       network.info$nets[[segment]][edge, network.info$target]) {
-      dir = 0
-    } else if(S.temp[network.info$parent] == 0) {
-      dir = -1
+    S.proposal.seg = S.temp
+    
+    # Half the time, swap the edge state
+    if(runif(1, 0, 1) > 0.5) {
+      S.proposal.seg[edge] = !S.temp[edge]*1
+      if(S.proposal.seg[edge] == 0) {
+        dir = -1
+      } else {
+        dir = 1
+      }
     } else {
-      dir = 1
+      dir = 0
     }
-
+    
+    S.proposal[segment,] = S.proposal.seg
+    
     ## Compute the projection matrix with a modified edge ("Pxl modified")
-    Pxlm = computePx(length(y.temp), x.temp[,which(S.temp == 1)], 
+    Pxlm = computePx(length(y.temp), x.temp[,which(S.proposal.seg == 1)], 
                      delta2[segment])
      
     likelihood.temp = CalculateLikelihoodRatio(gamma0, y.temp, Pxlm, Pxl, v0, 
@@ -122,9 +156,14 @@ function(x, y, S, B, Sig2, q,
  
   }
     
+  lambda = lambda[network.info$global.mapping[network.info$target,]]
+  
+  network.info = addProposalNetworkInfo(network.info, S.proposal[,1:q,drop=FALSE], E)
+  
   # Ratio of proposal probabilities (1 because the move is symmetric)
   proposal.ratio = 1
     
+  if(length(lambda) != length(network.info$nets)) browser()
   # Ratio of network structure priors
   prior.ratio = CalculatePriorRatio(method, q, lambda, network.info);
     
@@ -133,9 +172,10 @@ function(x, y, S, B, Sig2, q,
     
   ## Sample u 
   u = runif(1,0,1)
- 
+
   if(u <= min(1,r.indiv) && AcceptableMove(S.proposal, qmax, 
-                              network.info$self.loops, network.info$target)) {
+                              network.info$self.loops, network.info$target,
+                              fixed.edges)) {
     accept = 1
     newS = S.proposal
   }

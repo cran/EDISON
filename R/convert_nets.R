@@ -1,6 +1,22 @@
+#' Convert internal representation of networks.
+#' 
+#' Converts from representing the network as a list of target nodes to
+#' representing it as a list of segments.
+#' 
+#' 
+#' @param Ball Input network: List of target nodes, where each element is a
+#' NumSegs by NumNodes matrix giving the parents for the target node in each
+#' segment.
+#' @param Eall Changepoints: List of target nodes, where each element contains
+#' a vector of changepoints.
+#' @return List with elements: \item{B_nets}{List of segments, where each
+#' element contains a matrix of size NumNodes by NumNodes, representing the
+#' network for that segment.} \item{segs}{Vector containing the global segment
+#' boundaries.}
+#' @author Frank Dondelinger
+#' @export convert_nets
 convert_nets <-
 function(Ball, Eall) {
-  B_nets = list()
   
   # Find 'global' segments (set of all target-specific segments)
   segs = c()
@@ -12,23 +28,33 @@ function(Ball, Eall) {
   segs = sort(unique(segs));
   
   # Initialise segment list
-  for(segment in 1:(length(segs)-1)) {
-    B_nets[[segment]] = matrix(0, dim(Ball[[1]])[2], length(Ball))
-  }
+  B_nets = list()
+
+  mapping = matrix(0, length(Eall), length(segs) - 1)
   
   # Build up segment list
-  for(target in 1:length(Ball)) {
-    local_seg = 0;
-    for(segment in 1:(length(segs) - 1)) {
-      if(segs[segment] %in% Eall[[target]]) {
-        local_seg = local_seg + 1;
-        B_nets[[segment]][,target] = Ball[[target]][local_seg,] 
-      } else {
-        B_nets[[segment]][,target] = Ball[[target]][local_seg,]
-      }
-    }
-  }
+  local.seg = rep(0, length(Ball))
+  empty.matrix = matrix(0, dim(Ball[[1]])[2], length(Ball))
   
-  return(list(B_nets=B_nets, seg=segs))
+  for(segment in 1:(length(segs) - 1)) {
+      
+    seg.net = empty.matrix
+      
+    for(target in 1:length(Ball)) {
+      local.seg.temp = local.seg[target]
+
+      if(segs[segment] == Eall[[target]][local.seg.temp+1]) {
+        local.seg.temp = local.seg.temp + 1
+        local.seg[target] = local.seg.temp
+      } 
+        
+      seg.net[,target] = Ball[[target]][local.seg.temp,] 
+      mapping[target, segment] = local.seg.temp
+    }
+      
+    B_nets[[segment]] = seg.net
+  }
+
+  return(list(B_nets=B_nets, seg=segs, mapping=mapping))
 }
 

@@ -1,3 +1,25 @@
+#' Initialise the MCMC simulation.
+#' 
+#' This function intialises the parameters and variables needed for the MCMC
+#' simulation.
+#' 
+#' 
+#' @param X Input response data.
+#' @param Y Input target data.
+#' @param sinit Initial changepoints.
+#' @param GLOBvar Global variables used during the MCMC simulation.
+#' @param HYPERvar Hyperparameter variables.
+#' @param options MCMC simulation options as obtained e.g. by
+#' \code{\link{defaultOptions}}.
+#' @return List with elements: \item{counters}{Matrices for counting the number
+#' of moves made and accepted.} \item{initState}{Initial state of the variables
+#' of the MCMC simulation.} \item{listStock}{Variables for recording the
+#' network, changepoint and hyperparameter samples.}
+#' @author Sophie Lebre
+#' 
+#' Frank Dondelinger
+#' @seealso \code{\link{sampleParms}}
+#' @export init
 init <-
 function(X, Y, sinit, GLOBvar, HYPERvar, options){
   ### Assignment of global variables used here ###
@@ -28,11 +50,11 @@ function(X, Y, sinit, GLOBvar, HYPERvar, options){
   for(target in 1:length(X)) {
     # For stocking B (vector of predictor coefficients + 
     # constant (q+1) for each phase (smax+1))
-    Bstock[[target]] = matrix(0, niter, (q+1)*(smax+p))
+    Bstock[[target]] = matrix(0, niter-1, (q+1)*(smax+p))
     # For stocking E (vector of changepoints)
-    Estock[[target]] = matrix(0, niter, smax+p+1)
+    Estock[[target]] = matrix(0, niter-1, smax+p+1)
   }
-    
+
   ## Initialisation
   init = sampleParms(X, GLOBvar, HYPERvar, s_init=sinit, options) 
 
