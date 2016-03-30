@@ -8,7 +8,7 @@
 #' information sharing priors provide a reduction of the inference uncertainty.
 #' 
 #' \tabular{ll}{ Package: \tab EDISON\cr Type: \tab Package\cr Version: \tab
-#' 1.1\cr Date: \tab 2014-09-13\cr License: \tab GPL-2\cr LazyLoad: \tab yes\cr
+#' 1.1.1\cr Date: \tab 2016-03-30\cr License: \tab GPL-2\cr LazyLoad: \tab yes\cr
 #' }
 #' 
 #' @name EDISON-package
